@@ -77,64 +77,17 @@ The bottleneck shifts entirely to **DOM pruning quality**. The cleaner you can m
 
 ## Pipeline Comparison
 
-```
-TRADITIONAL RAG                          VECTOR-LESS RAG
-════════════════════════════════         ════════════════════════════════
+![Pipeline comparison: Traditional RAG vs Vector-less RAG](docs/comparison.svg)
 
- ┌─────────────────────┐                  ┌─────────────────────┐
- │   HTML page (raw)   │                  │   HTML page (raw)   │
- └──────────┬──────────┘                  └──────────┬──────────┘
-            │                                        │
-            ▼                                        ▼
- ┌─────────────────────┐                  ┌─────────────────────┐
- │  preprocess_html()  │                  │    prune_dom()      │
- │  strip + trim       │                  │  strip + collapse   │
- │  → 2000 chars       │                  │  → 6000 chars       │
- └──────────┬──────────┘                  └──────────┬──────────┘
-            │                                        │
-            ▼                                        │
- ┌─────────────────────┐                             │
- │ sentence-transformers│                             │
- │  embed snippet      │                             │
- └──────────┬──────────┘                             │
-            │                                        │
-            ▼                                        │
- ┌─────────────────────┐                             │
- │     ChromaDB        │                             │
- │  cosine search      │                             │
- │  filter by field    │                             │
- └──────────┬──────────┘                             │
-            │                                        │
-            ▼                                        ▼
- ┌─────────────────────┐                  ┌─────────────────────┐
- │  Retrieved examples │                  │  (no retrieval)     │
- │  html → selector    │                  │                     │
- │  html → selector    │                  │                     │
- │  html → selector    │                  │                     │
- └──────────┬──────────┘                  └──────────┬──────────┘
-            │                                        │
-            ▼                                        ▼
- ┌─────────────────────┐                  ┌─────────────────────┐
- │       Claude        │                  │       Claude        │
- │  few-shot prompt    │                  │  direct DOM prompt  │
- │  + page snippet     │                  │  + pruned DOM       │
- └──────────┬──────────┘                  └──────────┬──────────┘
-            │                                        │
-            ▼                                        ▼
-      CSS selector                             CSS selector
-            │                                        │
-            ▼                                        ▼
-     apply to DOM                             apply to DOM
-            │                                        │
-            ▼                                        ▼
-         value ✓                                  value ✓
-
-
-  Infrastructure: ChromaDB + embedder         Infrastructure: none
-  Cold-start:     fails on new domains        Cold-start: works immediately
-  Staleness:      index goes stale silently   Staleness: always live DOM
-  Accuracy boost: yes, with good examples     Accuracy: depends on pruning
-```
+| Stage | Traditional RAG | Vector-less RAG |
+|---|---|---|
+| Infrastructure | ChromaDB + sentence-transformers | None |
+| Preprocessing | `preprocess_html()` → 2 000 chars | `prune_dom()` → 6 000 chars |
+| Retrieval | Cosine search, top-k examples | — skipped entirely — |
+| LLM context | Past (html → selector) examples | Live pruned DOM |
+| Cold-start | Fails on unseen domains | Works immediately |
+| Staleness | Index goes stale silently | Always sees current DOM |
+| Accuracy driver | Quality of example bank | Quality of DOM pruning |
 
 ---
 
